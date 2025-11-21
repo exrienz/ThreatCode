@@ -1,10 +1,10 @@
-# ThreatCode-Review
+# ThreatCode
 
 **Part of the [ThreatVault.io](https://threatvault.io) Ecosystem**
 
-AI-Powered Security Code Scanner that uses Large Language Models to analyze source code for security vulnerabilities. ThreatCode-Review is a key component of the ThreatVault security tooling suite.
+AI-Powered Security Code Scanner that uses Large Language Models to analyze source code for security vulnerabilities. ThreatCode is a key component of the ThreatVault security tooling suite.
 
-> **📖 New to ThreatCode-Review?** See [QUICKSTART.md](QUICKSTART.md) for the simplest way to get started!
+> **📖 New to ThreatCode?** See [QUICKSTART.md](QUICKSTART.md) for the simplest way to get started!
 > **⚡ Quick Reference:** See [CHEATSHEET.md](CHEATSHEET.md) for copy-paste commands!
 
 ## Features
@@ -40,7 +40,7 @@ AI-Powered Security Code Scanner that uses Large Language Models to analyze sour
 
 1. **Build the image** (one-time):
 ```bash
-cd /path/to/ThreatCode-Review
+cd /path/to/ThreatCode
 docker build -t security-scanner .
 ```
 
@@ -56,7 +56,7 @@ docker run --rm \
   -e OPENROUTER_MODEL=anthropic/claude-3-haiku \
   security-scanner scan \
   --input /scan \
-  --output /scan/reports \
+  --output /scan \
   --name "MyApplication"
 
 # Using OpenAI
@@ -67,7 +67,7 @@ docker run --rm \
   -e OPENAI_MODEL=gpt-4 \
   security-scanner scan \
   --input /scan \
-  --output /scan/reports \
+  --output /scan \
   --name "MyApplication"
 
 # Using Custom Provider
@@ -78,11 +78,30 @@ docker run --rm \
   -e CUSTOM_PROVIDER_URL=https://my-llm.example.com/v1 \
   security-scanner scan \
   --input /scan \
-  --output /scan/reports \
+  --output /scan \
   --name "MyApplication"
 ```
 
 **That's it!** Reports are created in `./reports/` subdirectory with no permission errors.
+
+**Alternative: Using Pre-built Docker Hub Image**
+
+If you don't want to build the image locally, you can use the pre-built image from Docker Hub:
+
+```bash
+# Using OpenRouter with pre-built image
+docker run --rm \
+  -v $(pwd):/scan \
+  -e LLM_PROVIDER=openrouter \
+  -e OPENROUTER_API_KEY=YOUR_API_KEY \
+  -e OPENROUTER_MODEL=z-ai/glm-4.5-air:free \
+  exrienz/threatcode:latest scan \
+  --input /scan \
+  --output /scan \
+  --name "APP_NAME"
+```
+
+This approach eliminates the need for the build step and pulls the image directly from Docker Hub.
 
 **Alternative: Using .env file**
 ```bash
@@ -99,7 +118,7 @@ docker run --rm \
   --env-file .env \
   security-scanner scan \
   --input /scan \
-  --output /scan/reports \
+  --output /scan \
   --name "MyApplication"
 ```
 
@@ -347,7 +366,7 @@ This avoids permission issues by writing to `/scan/reports` subdirectory.
 
 ## ThreatVault Ecosystem
 
-ThreatCode-Review is part of the ThreatVault.io security platform, which provides comprehensive security tooling for development teams. Visit [ThreatVault.io](https://threatvault.io) to learn more about the complete security ecosystem.
+ThreatCode is part of the ThreatVault.io security platform, which provides comprehensive security tooling for development teams. Visit [ThreatVault.io](https://threatvault.io) to learn more about the complete security ecosystem.
 
 ## License
 
@@ -359,4 +378,4 @@ Contributions are welcome! Please submit pull requests or open issues for bugs a
 
 ---
 
-**ThreatCode-Review** - Secure Code Analysis, Powered by AI | Part of [ThreatVault.io](https://threatvault.io)
+**ThreatCode** - Secure Code Analysis, Powered by AI | Part of [ThreatVault.io](https://threatvault.io)

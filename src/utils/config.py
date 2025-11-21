@@ -119,7 +119,7 @@ class ReportData(BaseModel):
 
     # Optional fields for enhanced reporting
     version: Optional[str] = None
-    auditor: Optional[str] = "ThreatCode-Review AI Scanner"
+    auditor: Optional[str] = "ThreatCode AI Scanner"
     methodology: Optional[str] = "Automated AI-powered source code security analysis using LLM"
     executive_summary: Optional[str] = None
     conclusion: Optional[str] = None

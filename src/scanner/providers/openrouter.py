@@ -28,7 +28,7 @@ class OpenRouterProvider(BaseLLMProvider):
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://github.com/threatcode-review",
-            "X-Title": "ThreatCode-Review Security Scanner"
+            "X-Title": "ThreatCode Security Scanner"
         }
 
     def get_endpoint(self) -> str:
@@ -78,6 +78,12 @@ class OpenRouterProvider(BaseLLMProvider):
                 headers=self.get_headers(),
                 json=payload
             )
+
+            # Log detailed error information before raising
+            if response.status_code != 200:
+                error_detail = f"HTTP {response.status_code}: {response.text}"
+                print(f"Error: OpenRouter API request failed - {error_detail}")
+
             response.raise_for_status()
 
             data = response.json()

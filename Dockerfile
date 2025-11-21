@@ -1,4 +1,4 @@
-# Multi-stage build for ThreatCode-Review Security Scanner
+# Multi-stage build for ThreatCode Security Scanner
 
 # Build stage: Install dependencies
 FROM python:3.9-slim as builder

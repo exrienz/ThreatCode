@@ -1,4 +1,4 @@
-"""Main CLI entry point for ThreatCode-Review security scanner."""
+"""Main CLI entry point for ThreatCode security scanner."""
 import sys
 import click
 from pathlib import Path
@@ -9,9 +9,9 @@ from src.utils.formatters import ReportFormatter
 
 
 @click.group()
-@click.version_option(version="1.0.0", prog_name="ThreatCode-Review")
+@click.version_option(version="1.0.0", prog_name="ThreatCode")
 def cli():
-    """ThreatCode-Review - AI-Powered Security Code Scanner.
+    """ThreatCode - AI-Powered Security Code Scanner.
 
     Analyze source code for security vulnerabilities using LLM providers.
     """
@@ -66,7 +66,7 @@ def scan(input, output, name, max_file_size, max_workers):
         python -m src.main scan -i /path/to/code -o ./reports
     """
     click.echo("=" * 60)
-    click.echo("ThreatCode-Review Security Scanner")
+    click.echo("ThreatCode Security Scanner")
     click.echo("=" * 60)
 
     try:
@@ -139,7 +139,7 @@ def scan(input, output, name, max_file_size, max_workers):
 @cli.command()
 def version():
     """Show version information."""
-    click.echo("ThreatCode-Review v1.0.0")
+    click.echo("ThreatCode v1.0.0")
     click.echo("AI-Powered Security Code Scanner")
 
 
