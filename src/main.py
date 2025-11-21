@@ -128,6 +128,8 @@ def scan(input, output, name, max_file_size, max_workers):
         click.echo("  - OPENROUTER_MODEL (for OpenRouter)", err=True)
         click.echo("  - OPENAI_API_KEY (for OpenAI)", err=True)
         click.echo("  - OPENAI_MODEL (for OpenAI)", err=True)
+        click.echo("  - CUSTOM_API_KEY (for custom provider)", err=True)
+        click.echo("  - CUSTOM_MODEL (for custom provider)", err=True)
         click.echo("  - CUSTOM_PROVIDER_URL (for custom provider)", err=True)
         sys.exit(1)
 
@@ -167,9 +169,9 @@ def providers():
     click.echo("   Custom base URL")
     click.echo("   Environment variables:")
     click.echo("     - LLM_PROVIDER=custom")
-    click.echo("     - OPENROUTER_API_KEY=<your-key>")
+    click.echo("     - CUSTOM_API_KEY=<your-key>")
+    click.echo("     - CUSTOM_MODEL=<model-name>")
     click.echo("     - CUSTOM_PROVIDER_URL=<base-url>")
-    click.echo("     - OPENROUTER_MODEL=<model-name>")
     click.echo()
 
 
