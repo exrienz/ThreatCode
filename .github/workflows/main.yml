@@ -1,0 +1,19 @@
+# .github/workflows/devsecops.yml
+name: DevSecOps Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+jobs:
+  devsecops:
+    uses: exrienz/secops-template/.github/workflows/devsecops.yml@main
+    with:
+      enable_sca: true
+      enable_sast: true
+      enable_docker_build: true
+      enable_container_scan: true
+      enable_auto_lint: false
+      languages: "python"
+    secrets: inherit
