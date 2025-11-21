@@ -31,8 +31,6 @@ docker run --rm \
 
 **That's it!** Your security report will be generated in the same folder.
 
-> **📁 Important:** Always use `--output /scan` to save reports in your project folder. No need to create a separate reports directory.
-
 ---
 
 ## 📋 What You'll Get
