@@ -125,6 +125,115 @@ docker run --rm \
 
 ---
 
+## 🔍 Maker-Checker Mode (Reduce False Positives)
+
+ThreatCode can use **two different LLMs** in a maker-checker pattern to validate findings and eliminate false positives.
+
+### How It Works
+
+1. **Maker LLM** (Primary) scans your code and finds potential vulnerabilities
+2. **Checker LLM** (Validator) independently reviews each finding
+3. Each finding gets a verdict: **Confirmed**, **Likely False Positive**, or **Needs Review**
+
+### Enable Maker-Checker
+
+#### Using OpenRouter for Both Maker and Checker
+
+Add checker configuration to your `.env` file:
+
+```env
+# Primary scanner (Maker)
+LLM_PROVIDER=openrouter
+OPENROUTER_API_KEY=your_key_here
+OPENROUTER_MODEL=anthropic/claude-3-haiku
+
+# Enable validation (Checker)
+ENABLE_CHECKER=true
+CHECKER_PROVIDER=openrouter
+CHECKER_OPENROUTER_API_KEY=your_key_here
+CHECKER_OPENROUTER_MODEL=anthropic/claude-3-opus  # Use a better model for validation
+```
+
+Or use Docker environment variables:
+
+```bash
+docker run --rm \
+  -v $(pwd):/scan \
+  -e LLM_PROVIDER=openrouter \
+  -e OPENROUTER_API_KEY=YOUR_API_KEY \
+  -e OPENROUTER_MODEL=anthropic/claude-3-haiku \
+  -e ENABLE_CHECKER=true \
+  -e CHECKER_PROVIDER=openrouter \
+  -e CHECKER_OPENROUTER_API_KEY=YOUR_API_KEY \
+  -e CHECKER_OPENROUTER_MODEL=anthropic/claude-3-opus \
+  exrienz/threatcode:latest scan \
+  --input /scan \
+  --output /scan \
+  --name "MyApp"
+```
+
+#### Using OpenAI as Checker
+
+Mix providers for better validation:
+
+```bash
+docker run --rm \
+  -v $(pwd):/scan \
+  -e LLM_PROVIDER=openrouter \
+  -e OPENROUTER_API_KEY=YOUR_OPENROUTER_KEY \
+  -e OPENROUTER_MODEL=anthropic/claude-3-haiku \
+  -e ENABLE_CHECKER=true \
+  -e CHECKER_PROVIDER=openai \
+  -e CHECKER_OPENAI_API_KEY=YOUR_OPENAI_KEY \
+  -e CHECKER_OPENAI_MODEL=gpt-4 \
+  exrienz/threatcode:latest scan \
+  --input /scan \
+  --output /scan \
+  --name "MyApp"
+```
+
+#### Using Custom Provider as Checker
+
+For custom LLM endpoints:
+
+```bash
+docker run --rm \
+  -v $(pwd):/scan \
+  -e LLM_PROVIDER=openrouter \
+  -e OPENROUTER_API_KEY=YOUR_API_KEY \
+  -e OPENROUTER_MODEL=anthropic/claude-3-haiku \
+  -e ENABLE_CHECKER=true \
+  -e CHECKER_PROVIDER=custom \
+  -e CHECKER_CUSTOM_API_KEY=YOUR_CUSTOM_KEY \
+  -e CHECKER_CUSTOM_MODEL=your-model-name \
+  -e CHECKER_CUSTOM_PROVIDER_URL=https://your-api.com/v1 \
+  -e ALLOW_ALL_CUSTOM_URLS=true \
+  exrienz/threatcode:latest scan \
+  --input /scan \
+  --output /scan \
+  --name "MyApp"
+```
+
+### Best Practices
+
+- **Use a stronger model for the checker** (e.g., Claude Opus for checking, Haiku for scanning)
+- **Mix providers** for diversity (e.g., OpenRouter for maker, OpenAI for checker)
+- Validation adds ~1 API call per finding, so costs increase proportionally
+
+### What You Get
+
+Reports will show validation status for each finding:
+- ✅ **Confirmed** - Legitimate vulnerability (green badge)
+- ❌ **Likely False Positive** - Can be safely ignored (red badge)
+- ⚠️ **Needs Review** - Uncertain, needs human review (orange badge)
+
+Each validation includes:
+- Confidence level (High/Medium/Low)
+- Detailed rationale explaining the verdict
+- Model used for validation
+
+---
+
 ## 🎯 Supported Languages
 
 ThreatCode analyzes these file types:
@@ -230,6 +339,8 @@ ThreatCode follows security best practices:
 
 ## 📊 Environment Variables Reference
 
+### Primary Scanner (Maker) Configuration
+
 | Variable | Description | Required | Example |
 |----------|-------------|----------|---------|
 | `LLM_PROVIDER` | Provider choice | Yes | `openrouter`, `openai`, `custom` |
@@ -242,6 +353,20 @@ ThreatCode follows security best practices:
 | `CUSTOM_PROVIDER_URL` | Custom provider base URL | For custom | `https://api.example.com/v1` |
 | `RATE_LIMIT_DELAY` | Delay between requests (seconds) | No | `0.5` (default) |
 | `ALLOW_ALL_CUSTOM_URLS` | Bypass URL allowlist ⚠️ | No | `false` (default) |
+
+### Checker Configuration (Optional - For False Positive Reduction)
+
+| Variable | Description | Required | Example |
+|----------|-------------|----------|---------|
+| `ENABLE_CHECKER` | Enable maker-checker validation | No | `true` or `false` (default) |
+| `CHECKER_PROVIDER` | Checker provider type | If checker enabled | `openrouter`, `openai`, `custom` |
+| `CHECKER_OPENROUTER_API_KEY` | Checker OpenRouter API key | For OpenRouter checker | `sk-or-v1-...` |
+| `CHECKER_OPENROUTER_MODEL` | Checker OpenRouter model | For OpenRouter checker | `anthropic/claude-3-opus` |
+| `CHECKER_OPENAI_API_KEY` | Checker OpenAI API key | For OpenAI checker | `sk-...` |
+| `CHECKER_OPENAI_MODEL` | Checker OpenAI model | For OpenAI checker | `gpt-4` |
+| `CHECKER_CUSTOM_API_KEY` | Checker custom API key | For custom checker | Your API key |
+| `CHECKER_CUSTOM_MODEL` | Checker custom model | For custom checker | Model identifier |
+| `CHECKER_CUSTOM_PROVIDER_URL` | Checker custom base URL | For custom checker | `https://api.example.com/v1` |
 
 ---
 

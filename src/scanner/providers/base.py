@@ -53,6 +53,24 @@ class BaseLLMProvider(ABC):
         """
         pass
 
+    @abstractmethod
+    async def validate_finding(self, finding: Finding, original_code: str) -> Dict:
+        """Validate a security finding to eliminate false positives.
+
+        Args:
+            finding: Finding to validate
+            original_code: Original code that was analyzed
+
+        Returns:
+            Dictionary with validation results:
+            {
+                "verdict": "Confirmed|Likely False Positive|Needs Review",
+                "confidence": "High|Medium|Low",
+                "rationale": "Explanation of the verdict"
+            }
+        """
+        pass
+
     def get_security_prompt(self, code_chunk: str, context: dict) -> str:
         """Generate security analysis prompt.
 
@@ -130,6 +148,64 @@ Required JSON format:
 }}
 
 Note: The optional fields (cvss_score, impact, attack_scenario, references) should be included when applicable to provide comprehensive security analysis.
+
+Return ONLY the JSON response. No additional text, no markdown code blocks, just pure JSON."""
+
+        return prompt
+
+    def get_validation_prompt(self, finding: Finding, original_code: str) -> str:
+        """Generate validation prompt for checker LLM.
+
+        Args:
+            finding: Finding to validate
+            original_code: Original code that was analyzed
+
+        Returns:
+            Formatted prompt for validation
+        """
+        evidence_text = "\n".join([
+            f"- File: {ev.file_path}, Line: {ev.line_number}\n  Code: {ev.code}"
+            for ev in finding.evidence
+        ])
+
+        prompt = f"""Act as a senior security auditor performing a second-level review of a security finding. Your task is to validate whether this finding is a TRUE POSITIVE or a FALSE POSITIVE.
+
+**Finding to Validate:**
+Title: {finding.title}
+Severity: {finding.severity}
+Description: {finding.description}
+
+Evidence:
+{evidence_text}
+
+Remediation Suggested: {finding.remediation}
+
+**Original Code Context:**
+```
+{original_code}
+```
+
+**Your Task:**
+Carefully review the finding and the code context. Determine whether this is:
+1. **Confirmed**: A legitimate security vulnerability that should be addressed
+2. **Likely False Positive**: The finding appears to be incorrect or the code is actually safe
+3. **Needs Review**: Uncertain - requires human expert review
+
+Consider the following in your analysis:
+- Is the vulnerability actually exploitable in this context?
+- Are there mitigating controls or security measures in place?
+- Is the code snippet taken out of context?
+- Does the finding accurately describe the security risk?
+- Is the severity assessment appropriate?
+
+**IMPORTANT**: Return your validation in JSON format ONLY. Do not include any additional text, explanations, or markdown formatting outside the JSON structure.
+
+Required JSON format:
+{{
+    "verdict": "Confirmed|Likely False Positive|Needs Review",
+    "confidence": "High|Medium|Low",
+    "rationale": "Detailed explanation of why you reached this verdict, including specific code references and reasoning"
+}}
 
 Return ONLY the JSON response. No additional text, no markdown code blocks, just pure JSON."""
 

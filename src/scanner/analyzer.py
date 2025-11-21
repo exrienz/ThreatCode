@@ -25,7 +25,9 @@ class CodeAnalyzer:
         self.scan_config = scan_config
         self.llm_config = llm_config
         self.provider = self._create_provider()
+        self.checker_provider = self._create_checker_provider() if llm_config.enable_checker else None
         self.file_collector = FileCollector(scan_config)
+        self.batch_codes = {}  # Store original code for validation
 
     def _create_provider(self) -> BaseLLMProvider:
         """Create appropriate LLM provider based on config.
@@ -61,6 +63,43 @@ class CodeAnalyzer:
         else:
             raise ValueError(f"Unknown provider: {self.llm_config.provider}")
 
+    def _create_checker_provider(self) -> BaseLLMProvider:
+        """Create checker LLM provider for validation.
+
+        Returns:
+            Initialized checker provider instance
+        """
+        if not self.llm_config.checker_provider:
+            raise ValueError("Checker provider not configured")
+
+        if self.llm_config.checker_provider == "openrouter":
+            return OpenRouterProvider(
+                api_key=self.llm_config.checker_api_key,
+                model=self.llm_config.checker_model,
+                timeout=self.llm_config.timeout,
+                rate_limit_delay=self.llm_config.rate_limit_delay
+            )
+        elif self.llm_config.checker_provider == "openai":
+            return OpenAIProvider(
+                api_key=self.llm_config.checker_api_key,
+                model=self.llm_config.checker_model,
+                timeout=self.llm_config.timeout,
+                rate_limit_delay=self.llm_config.rate_limit_delay
+            )
+        elif self.llm_config.checker_provider == "custom":
+            # For custom provider, extend OpenRouterProvider with custom URL
+            provider = OpenRouterProvider(
+                api_key=self.llm_config.checker_api_key,
+                model=self.llm_config.checker_model,
+                timeout=self.llm_config.timeout,
+                rate_limit_delay=self.llm_config.rate_limit_delay
+            )
+            # Override base URL
+            provider.BASE_URL = str(self.llm_config.checker_base_url).rstrip('/')
+            return provider
+        else:
+            raise ValueError(f"Unknown checker provider: {self.llm_config.checker_provider}")
+
     async def analyze(self) -> ReportData:
         """Run the complete analysis.
 
@@ -69,6 +108,9 @@ class CodeAnalyzer:
         """
         print(f"Starting scan of: {self.scan_config.input_path}")
         print(f"Using provider: {self.llm_config.provider} with model: {self.llm_config.model}")
+        if self.llm_config.enable_checker:
+            print(f"Maker-Checker enabled: {self.llm_config.checker_provider} with model: {self.llm_config.checker_model}")
+            print("Findings will be validated to eliminate false positives")
 
         # Collect files
         print("\nCollecting files...")
@@ -103,13 +145,28 @@ class CodeAnalyzer:
             tasks = [process_batch_with_semaphore(batch) for batch in batches]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            for result in results:
+            for idx, result in enumerate(results):
                 if isinstance(result, Exception):
                     print(f"Warning: Batch processing error: {result}")
                 elif result:
                     all_findings.extend(result)
 
         print(f"\nAnalysis complete. Found {len(all_findings)} security issues.")
+
+        # Validate findings if checker is enabled
+        if self.llm_config.enable_checker and all_findings:
+            print(f"\nValidating {len(all_findings)} findings with checker LLM...")
+            all_findings = await self._validate_findings(all_findings)
+
+            # Count validation results
+            confirmed = sum(1 for f in all_findings if f.validation_verdict == "Confirmed")
+            false_positives = sum(1 for f in all_findings if f.validation_verdict == "Likely False Positive")
+            needs_review = sum(1 for f in all_findings if f.validation_verdict == "Needs Review")
+
+            print(f"Validation complete:")
+            print(f"  - Confirmed: {confirmed}")
+            print(f"  - Likely False Positives: {false_positives}")
+            print(f"  - Needs Review: {needs_review}")
 
         # Create report
         report = ReportData(
@@ -157,11 +214,74 @@ class CodeAnalyzer:
 
         try:
             batch_findings = await self.provider.analyze_code(code_chunk, context)
+
+            # Store code chunk for validation (use finding title as key)
+            if self.llm_config.enable_checker:
+                for finding in batch_findings:
+                    # Store original code for this finding
+                    finding_key = f"{finding.title}_{len(self.batch_codes)}"
+                    self.batch_codes[finding_key] = code_chunk
+
             findings.extend(batch_findings)
         except Exception as e:
             print(f"Warning: Error analyzing batch: {e}")
 
         return findings
+
+    async def _validate_findings(self, findings: List[Finding]) -> List[Finding]:
+        """Validate findings using checker LLM.
+
+        Args:
+            findings: List of findings to validate
+
+        Returns:
+            List of findings with validation results
+        """
+        if not self.checker_provider:
+            return findings
+
+        validated_findings = []
+
+        with tqdm(total=len(findings), desc="Validating findings") as pbar:
+            for idx, finding in enumerate(findings):
+                # Get the stored code for this finding
+                finding_key = f"{finding.title}_{idx}" if f"{finding.title}_{idx}" in self.batch_codes else None
+
+                # If we don't have stored code, use the evidence code
+                original_code = self.batch_codes.get(finding_key, "")
+                if not original_code and finding.evidence:
+                    # Fallback: combine evidence code snippets
+                    original_code = "\n\n".join([
+                        f"# File: {ev.file_path}\n{ev.code}"
+                        for ev in finding.evidence
+                    ])
+
+                try:
+                    # Validate the finding
+                    validation_result = await self.checker_provider.validate_finding(
+                        finding, original_code
+                    )
+
+                    # Update finding with validation results
+                    finding.validated = True
+                    finding.validation_verdict = validation_result["verdict"]
+                    finding.validation_confidence = validation_result["confidence"]
+                    finding.validation_rationale = validation_result["rationale"]
+                    finding.validated_by_model = self.llm_config.checker_model
+
+                except Exception as e:
+                    print(f"\nWarning: Error validating finding '{finding.title}': {e}")
+                    # Mark as needs review on error
+                    finding.validated = True
+                    finding.validation_verdict = "Needs Review"
+                    finding.validation_confidence = "Low"
+                    finding.validation_rationale = f"Validation error: {str(e)}"
+                    finding.validated_by_model = self.llm_config.checker_model
+
+                validated_findings.append(finding)
+                pbar.update(1)
+
+        return validated_findings
 
     def run(self) -> ReportData:
         """Synchronous wrapper for running the analysis.

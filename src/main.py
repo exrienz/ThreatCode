@@ -104,11 +104,11 @@ def scan(input, output, name, max_file_size, max_workers):
         click.echo("SCAN SUMMARY")
         click.echo("=" * 60)
         click.echo(f"Total Findings: {len(report_data.findings)}")
-        click.echo(f"  Critical: {report_data.severity_stats.get('Critical', 0)}")
-        click.echo(f"  High: {report_data.severity_stats.get('High', 0)}")
-        click.echo(f"  Medium: {report_data.severity_stats.get('Medium', 0)}")
-        click.echo(f"  Low: {report_data.severity_stats.get('Low', 0)}")
-        click.echo(f"  Informational: {report_data.severity_stats.get('Informational', 0)}")
+        click.echo(f"  Critical: {report_data.severity_stats.get('critical', 0)}")
+        click.echo(f"  High: {report_data.severity_stats.get('high', 0)}")
+        click.echo(f"  Medium: {report_data.severity_stats.get('medium', 0)}")
+        click.echo(f"  Low: {report_data.severity_stats.get('low', 0)}")
+        click.echo(f"  Informational: {report_data.severity_stats.get('info', 0)}")
 
         click.echo("\nReports generated:")
         for format_type, path in reports.items():

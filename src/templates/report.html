@@ -211,6 +211,76 @@
         .toc a:hover {
             text-decoration: underline;
         }
+
+        .validation-box {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .validation-box.confirmed {
+            border-color: #27ae60;
+            background: #d5f4e6;
+        }
+
+        .validation-box.false-positive {
+            border-color: #e74c3c;
+            background: #fadbd8;
+        }
+
+        .validation-box.needs-review {
+            border-color: #f39c12;
+            background: #fef5e7;
+        }
+
+        .validation-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.9em;
+            margin-left: 10px;
+        }
+
+        .validation-badge.confirmed {
+            background: #27ae60;
+            color: white;
+        }
+
+        .validation-badge.false-positive {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .validation-badge.needs-review {
+            background: #f39c12;
+            color: white;
+        }
+
+        .confidence-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 0.85em;
+            margin-left: 8px;
+        }
+
+        .confidence-badge.high {
+            background: #27ae60;
+            color: white;
+        }
+
+        .confidence-badge.medium {
+            background: #f39c12;
+            color: white;
+        }
+
+        .confidence-badge.low {
+            background: #95a5a6;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -338,6 +408,38 @@
                     <h3>Suggested Remediation</h3>
                     <div class="recommendation">
                         {{ finding.remediation | safe }}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if finding.validated %}
+                <div class="finding-section">
+                    <h3>Validation Status
+                        {% if finding.validation_verdict == "Confirmed" %}
+                        <span class="validation-badge confirmed">✓ Confirmed</span>
+                        {% elif finding.validation_verdict == "Likely False Positive" %}
+                        <span class="validation-badge false-positive">✗ Likely False Positive</span>
+                        {% elif finding.validation_verdict == "Needs Review" %}
+                        <span class="validation-badge needs-review">⚠ Needs Review</span>
+                        {% endif %}
+                        {% if finding.validation_confidence %}
+                        <span class="confidence-badge {{ finding.validation_confidence | lower }}">{{ finding.validation_confidence }} Confidence</span>
+                        {% endif %}
+                    </h3>
+                    {% if finding.validation_verdict == "Confirmed" %}
+                    <div class="validation-box confirmed">
+                    {% elif finding.validation_verdict == "Likely False Positive" %}
+                    <div class="validation-box false-positive">
+                    {% elif finding.validation_verdict == "Needs Review" %}
+                    <div class="validation-box needs-review">
+                    {% else %}
+                    <div class="validation-box">
+                    {% endif %}
+                        <p><strong>Validation Rationale:</strong></p>
+                        <p>{{ finding.validation_rationale | safe }}</p>
+                        {% if finding.validated_by_model %}
+                        <p style="margin-top: 10px; font-size: 0.9em; color: #7f8c8d;"><em>Validated by: {{ finding.validated_by_model }}</em></p>
+                        {% endif %}
                     </div>
                 </div>
                 {% endif %}

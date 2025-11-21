@@ -90,6 +90,120 @@ class OpenAIProvider(BaseLLMProvider):
 
             return findings
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type((httpx.HTTPError, JSONParseError))
+    )
+    async def validate_finding(self, finding: Finding, original_code: str) -> Dict:
+        """Validate a security finding using the checker LLM.
+
+        Args:
+            finding: Finding to validate
+            original_code: Original code that was analyzed
+
+        Returns:
+            Dictionary with validation results
+        """
+        prompt = self.get_validation_prompt(finding, original_code)
+
+        payload = {
+            "model": self.model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a senior security auditor. Return validation results in JSON format only."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "temperature": 0.2,  # Lower temperature for more consistent validation
+            "max_tokens": 4000,
+            "response_format": {"type": "json_object"}
+        }
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.post(
+                self.get_endpoint(),
+                headers=self.get_headers(),
+                json=payload
+            )
+            response.raise_for_status()
+
+            data = response.json()
+            content = data["choices"][0]["message"]["content"]
+
+            # Parse the validation response
+            validation_result = self._parse_validation(content, raise_on_error=True)
+
+            # Apply rate limiting delay
+            await self.apply_rate_limit()
+
+            return validation_result
+
+    def _parse_validation(self, content: str, raise_on_error: bool = False) -> Dict:
+        """Parse validation response from LLM.
+
+        Args:
+            content: JSON string from LLM
+            raise_on_error: If True, raise JSONParseError on unrecoverable errors
+
+        Returns:
+            Dictionary with verdict, confidence, and rationale
+        """
+        try:
+            # Clean up markdown code blocks if present
+            content = content.strip()
+            if content.startswith("```json"):
+                content = content[7:]
+            if content.startswith("```"):
+                content = content[3:]
+            if content.endswith("```"):
+                content = content[:-3]
+            content = content.strip()
+
+            # Try to extract JSON from mixed text
+            if not content.startswith("{"):
+                json_match = re.search(r'\{.*"verdict".*\}', content, re.DOTALL)
+                if json_match:
+                    content = json_match.group(0)
+                else:
+                    error_msg = "Could not find validation JSON in response"
+                    print(f"Warning: {error_msg}")
+                    if raise_on_error:
+                        raise JSONParseError(error_msg)
+                    return {
+                        "verdict": "Needs Review",
+                        "confidence": "Low",
+                        "rationale": "Failed to parse validation response"
+                    }
+
+            data = json.loads(content)
+
+            # Validate required fields
+            verdict = data.get("verdict", "Needs Review")
+            confidence = data.get("confidence", "Low")
+            rationale = data.get("rationale", "No rationale provided")
+
+            return {
+                "verdict": verdict,
+                "confidence": confidence,
+                "rationale": rationale
+            }
+
+        except json.JSONDecodeError as e:
+            error_msg = f"Failed to parse validation JSON: {e}"
+            print(f"Warning: {error_msg}")
+            if raise_on_error:
+                raise JSONParseError(error_msg)
+            return {
+                "verdict": "Needs Review",
+                "confidence": "Low",
+                "rationale": f"JSON parsing error: {str(e)}"
+            }
+
     def _parse_findings(self, content: str, raise_on_error: bool = False) -> List[Finding]:
         """Parse LLM response into Finding objects with robust error recovery.
 

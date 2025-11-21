@@ -2,7 +2,7 @@
 import os
 from datetime import datetime
 from typing import Dict, List, Literal, Optional
-from pydantic import BaseModel, HttpUrl, Field, field_validator
+from pydantic import BaseModel, HttpUrl, Field, field_validator, model_validator
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -17,6 +17,13 @@ class LLMConfig(BaseModel):
     base_url: Optional[HttpUrl] = None
     timeout: int = Field(default=30, ge=10, le=300)
     rate_limit_delay: float = Field(default=0.5, ge=0, le=10)  # Delay between requests in seconds
+
+    # Optional checker LLM for maker-checker pattern (false positive elimination)
+    enable_checker: bool = Field(default=False)  # Enable second LLM validation
+    checker_provider: Optional[Literal["openrouter", "openai", "custom"]] = None
+    checker_api_key: Optional[str] = None
+    checker_model: Optional[str] = None
+    checker_base_url: Optional[HttpUrl] = None
 
     # Allowlist for custom provider URLs (SSRF protection)
     ALLOWED_CUSTOM_DOMAINS: List[str] = Field(default_factory=lambda: [
@@ -51,6 +58,18 @@ class LLMConfig(BaseModel):
                     )
         return v
 
+    @model_validator(mode='after')
+    def validate_checker_config(self):
+        """Validate checker configuration when enabled."""
+        if self.enable_checker:
+            if not self.checker_provider:
+                raise ValueError("checker_provider is required when enable_checker is True")
+            if not self.checker_api_key:
+                raise ValueError("checker_api_key is required when enable_checker is True")
+            if not self.checker_model:
+                raise ValueError("checker_model is required when enable_checker is True")
+        return self
+
     @classmethod
     def from_env(cls) -> "LLMConfig":
         """Load configuration from environment variables."""
@@ -80,12 +99,44 @@ class LLMConfig(BaseModel):
         # Get optional rate limit delay from environment
         rate_limit_delay = float(os.getenv("RATE_LIMIT_DELAY", "0.5"))
 
+        # Load optional checker LLM configuration
+        enable_checker = os.getenv("ENABLE_CHECKER", "false").lower() == "true"
+        checker_provider = None
+        checker_api_key = None
+        checker_model = None
+        checker_base_url = None
+
+        if enable_checker:
+            checker_provider = os.getenv("CHECKER_PROVIDER", "openrouter").lower()
+
+            if checker_provider == "openrouter":
+                checker_api_key = os.getenv("CHECKER_OPENROUTER_API_KEY")
+                checker_model = os.getenv("CHECKER_OPENROUTER_MODEL", "anthropic/claude-3-haiku")
+            elif checker_provider == "openai":
+                checker_api_key = os.getenv("CHECKER_OPENAI_API_KEY")
+                checker_model = os.getenv("CHECKER_OPENAI_MODEL", "gpt-4")
+            elif checker_provider == "custom":
+                checker_api_key = os.getenv("CHECKER_CUSTOM_API_KEY")
+                checker_model = os.getenv("CHECKER_CUSTOM_MODEL", "default-model")
+                checker_url = os.getenv("CHECKER_CUSTOM_PROVIDER_URL")
+                if not checker_url:
+                    raise ValueError("CHECKER_CUSTOM_PROVIDER_URL is required for custom checker provider")
+                checker_base_url = checker_url
+
+            if not checker_api_key:
+                raise ValueError(f"Checker API key not found for provider: {checker_provider}")
+
         return cls(
             provider=provider,
             api_key=api_key,
             model=model,
             base_url=base_url,
-            rate_limit_delay=rate_limit_delay
+            rate_limit_delay=rate_limit_delay,
+            enable_checker=enable_checker,
+            checker_provider=checker_provider,
+            checker_api_key=checker_api_key,
+            checker_model=checker_model,
+            checker_base_url=checker_base_url
         )
 
 
@@ -108,6 +159,13 @@ class Finding(BaseModel):
     impact: Optional[str] = None  # Can be string or will be converted from list
     attack_scenario: Optional[str] = None  # Description of how the attack could be performed
     references: Optional[List[str]] = Field(default_factory=list)  # URLs or reference materials
+
+    # Maker-checker validation fields
+    validated: bool = Field(default=False)  # Whether this finding was validated by checker
+    validation_verdict: Optional[Literal["Confirmed", "Likely False Positive", "Needs Review"]] = None
+    validation_confidence: Optional[Literal["High", "Medium", "Low"]] = None  # Checker's confidence level
+    validation_rationale: Optional[str] = None  # Checker's reasoning for the verdict
+    validated_by_model: Optional[str] = None  # Model identifier used for validation
 
 
 class ReportData(BaseModel):
