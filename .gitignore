@@ -57,7 +57,7 @@ htmlcov/
 # OS
 Thumbs.db
 
-# Claude/Development files
+# Development files
 CLAUDE.md
 blueprint.txt
 CHEATSHEET.md

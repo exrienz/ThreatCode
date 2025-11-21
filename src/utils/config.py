@@ -65,8 +65,8 @@ class LLMConfig(BaseModel):
             model = os.getenv("OPENAI_MODEL", "gpt-4")
             base_url = None
         elif provider == "custom":
-            api_key = os.getenv("OPENROUTER_API_KEY")  # Reuse for custom
-            model = os.getenv("OPENROUTER_MODEL", "default-model")
+            api_key = os.getenv("CUSTOM_API_KEY")
+            model = os.getenv("CUSTOM_MODEL", "default-model")
             custom_url = os.getenv("CUSTOM_PROVIDER_URL")
             if not custom_url:
                 raise ValueError("CUSTOM_PROVIDER_URL is required for custom provider")

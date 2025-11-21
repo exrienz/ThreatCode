@@ -14,6 +14,8 @@ def cli():
     """ThreatCode - AI-Powered Security Code Scanner.
 
     Analyze source code for security vulnerabilities using LLM providers.
+
+    Created by exrienz - Part of the ThreatVault.io Ecosystem
     """
     pass
 
