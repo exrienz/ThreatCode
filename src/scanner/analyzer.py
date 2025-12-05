@@ -168,6 +168,15 @@ class CodeAnalyzer:
             print(f"  - Likely False Positives: {false_positives}")
             print(f"  - Needs Review: {needs_review}")
 
+            # Keep only validated findings that aren't flagged as false positives
+            if false_positives:
+                print(f"\nFiltering out {false_positives} likely false positive finding(s) from results")
+            all_findings = [
+                finding for finding in all_findings
+                if finding.validation_verdict != "Likely False Positive"
+            ]
+            print(f"Remaining validated findings: {len(all_findings)}")
+
         # Create report
         report = ReportData(
             application_name=self.scan_config.application_name,
