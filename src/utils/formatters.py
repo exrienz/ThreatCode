@@ -149,12 +149,14 @@ class ReportFormatter:
         # Summary statistics
         lines.append("SUMMARY")
         lines.append("-" * 80)
+        # Normalize keys to handle lower-case severity counters
+        severity = {k.lower(): v for k, v in report_data.severity_stats.items()}
         lines.append(f"Total Findings: {len(report_data.findings)}")
-        lines.append(f"  Critical: {report_data.severity_stats.get('Critical', 0)}")
-        lines.append(f"  High: {report_data.severity_stats.get('High', 0)}")
-        lines.append(f"  Medium: {report_data.severity_stats.get('Medium', 0)}")
-        lines.append(f"  Low: {report_data.severity_stats.get('Low', 0)}")
-        lines.append(f"  Informational: {report_data.severity_stats.get('Informational', 0)}")
+        lines.append(f"  Critical: {severity.get('critical', 0)}")
+        lines.append(f"  High: {severity.get('high', 0)}")
+        lines.append(f"  Medium: {severity.get('medium', 0)}")
+        lines.append(f"  Low: {severity.get('low', 0)}")
+        lines.append(f"  Informational: {severity.get('info', 0)}")
         lines.append("")
 
         # Detailed findings
