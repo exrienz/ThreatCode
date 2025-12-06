@@ -50,7 +50,12 @@ def cli():
     type=int,
     help='Maximum number of concurrent workers (default: 10)'
 )
-def scan(input, output, name, max_file_size, max_workers):
+@click.option(
+    '--ci',
+    is_flag=True,
+    help='Enable CI/CD friendly output and non-zero exit code on valid findings'
+)
+def scan(input, output, name, max_file_size, max_workers, ci):
     """Scan source code for security vulnerabilities.
 
     Examples:
@@ -94,6 +99,8 @@ def scan(input, output, name, max_file_size, max_workers):
         analyzer = CodeAnalyzer(scan_config, llm_config)
         report_data = analyzer.run()
 
+        ci_findings = _filter_valid_findings(report_data)
+
         # Generate reports
         click.echo("\nGenerating reports...")
         formatter = ReportFormatter(scan_config.output_path)
@@ -114,11 +121,19 @@ def scan(input, output, name, max_file_size, max_workers):
         for format_type, path in reports.items():
             click.echo(f"  {format_type.upper()}: {path}")
 
-        click.echo("\n" + "=" * 60)
-        click.echo("Scan completed successfully!")
-        click.echo("=" * 60)
+        if ci:
+            _print_ci_summary(ci_findings)
 
-        sys.exit(0)
+        click.echo("\n" + "=" * 60)
+        if ci and ci_findings:
+            click.echo("Valid security findings detected during CI/CD scan.")
+            click.echo("Failing pipeline to prevent unsafe deployments.")
+            click.echo("=" * 60)
+            sys.exit(1)
+        else:
+            click.echo("Scan completed successfully!")
+            click.echo("=" * 60)
+            sys.exit(0)
 
     except ValueError as e:
         click.echo(f"\nConfiguration Error: {e}", err=True)
@@ -138,6 +153,32 @@ def scan(input, output, name, max_file_size, max_workers):
         import traceback
         traceback.print_exc()
         sys.exit(1)
+
+
+def _filter_valid_findings(report_data):
+    """Return findings that are validated as real issues when possible."""
+    has_validation = any(f.validation_verdict for f in report_data.findings)
+    if has_validation:
+        return [f for f in report_data.findings if f.validation_verdict == "Confirmed"]
+    return report_data.findings
+
+
+def _print_ci_summary(findings):
+    """Print CI-friendly summary of validated findings with exploitation context."""
+    click.echo("\nCI/CD SUMMARY")
+    click.echo("=" * 60)
+    if not findings:
+        click.echo("No validated findings detected. Passing pipeline.")
+        return
+
+    click.echo(f"Valid Findings: {len(findings)}")
+    for finding in findings:
+        click.echo(f"- [{finding.severity}] {finding.title}")
+        exploitation = finding.attack_scenario or finding.description
+        if exploitation:
+            click.echo(f"  Exploitation: {exploitation}")
+        if finding.validation_verdict:
+            click.echo(f"  Validation: {finding.validation_verdict} ({finding.validation_confidence})")
 
 
 @cli.command()

@@ -52,6 +52,33 @@ Each report includes:
 
 ## 🔧 Configuration Options
 
+### CI/CD Pipeline Mode
+
+Use the `--ci` flag to get machine-friendly output and enforce a failing exit code when real issues are detected. When maker-checker validation is enabled, only **Confirmed** findings are shown in the CI summary, along with a short exploitation scenario so you can assess risk quickly.
+
+```bash
+docker run --rm \
+  -v $(pwd):/scan \
+  -e LLM_PROVIDER=openrouter \
+  -e OPENROUTER_API_KEY=YOUR_API_KEY \
+  -e OPENROUTER_MODEL=anthropic/claude-3-haiku \
+  -e ENABLE_CHECKER=true \
+  -e CHECKER_PROVIDER=openrouter \
+  -e CHECKER_OPENROUTER_API_KEY=YOUR_API_KEY \
+  -e CHECKER_OPENROUTER_MODEL=anthropic/claude-3-opus \
+  exrienz/threatcode:latest scan \
+  --input /scan \
+  --output /scan \
+  --name "MyApp" \
+  --ci
+```
+
+**Behavior in CI/CD:**
+
+- Pipeline-friendly summary is printed to stdout.
+- Only validated (Confirmed) findings are displayed when checker mode is enabled, with a short note on how an attacker could exploit each issue.
+- The command exits with status code **1** when valid findings exist, ensuring the CI job fails safely. No findings return **0**.
+
 ### Using OpenRouter (Recommended)
 
 ```bash
