@@ -50,7 +50,13 @@ def cli():
     type=int,
     help='Maximum number of concurrent workers (default: 10)'
 )
-def scan(input, output, name, max_file_size, max_workers):
+@click.option(
+    '--ci',
+    is_flag=True,
+    default=False,
+    help='Enable CI/CD-friendly output and fail the job when valid findings are present'
+)
+def scan(input, output, name, max_file_size, max_workers, ci):
     """Scan source code for security vulnerabilities.
 
     Examples:
@@ -114,10 +120,24 @@ def scan(input, output, name, max_file_size, max_workers):
         for format_type, path in reports.items():
             click.echo(f"  {format_type.upper()}: {path}")
 
+        if ci:
+            click.echo("\n" + "=" * 60)
+            click.echo("CI/CD MODE SUMMARY")
+            click.echo("=" * 60)
+            if report_data.findings:
+                click.echo("Valid findings detected. Job will exit with a non-zero status.")
+                for finding in report_data.findings:
+                    exploitation = finding.attack_scenario or finding.impact or finding.description
+                    click.echo(f"- [{finding.severity}] {finding.title}: {exploitation}")
+            else:
+                click.echo("No valid findings detected. Job will exit successfully.")
+
         click.echo("\n" + "=" * 60)
         click.echo("Scan completed successfully!")
         click.echo("=" * 60)
 
+        if ci and report_data.findings:
+            sys.exit(1)
         sys.exit(0)
 
     except ValueError as e:

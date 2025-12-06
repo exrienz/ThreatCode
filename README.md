@@ -218,6 +218,35 @@ docker run --rm \
 
 - **Use a stronger model for the checker** (e.g., Claude Opus for checking, Haiku for scanning)
 - **Mix providers** for diversity (e.g., OpenRouter for maker, OpenAI for checker)
+
+---
+
+## 🧪 CI/CD-Friendly Scans
+
+ThreatCode can be run inside your CI/CD pipeline to gate deployments on validated security findings.
+
+### Enable CI/CD Mode
+
+Add the `--ci` flag to the `scan` command:
+
+```bash
+docker run --rm \
+  -v $(pwd):/scan \
+  --env-file .env \
+  exrienz/threatcode:latest scan \
+  --input /scan \
+  --output /scan \
+  --name "MyApp" \
+  --ci
+```
+
+### What CI/CD Mode Does
+
+- **Exits with code 1 when valid findings exist** so your pipeline fails fast.
+- **Displays only validated findings** (confirmed or needs review) when maker-checker is enabled, reducing noise from false positives.
+- **Highlights exploitation paths** by printing each finding with its attack scenario/impact in the job logs.
+
+> Tip: Enable maker-checker (`ENABLE_CHECKER=true`) to ensure false positives are filtered before the CI/CD gate evaluates the results.
 - Validation adds ~1 API call per finding, so costs increase proportionally
 
 ### What You Get
