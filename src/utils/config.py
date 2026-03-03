@@ -11,7 +11,7 @@ load_dotenv()
 
 class LLMConfig(BaseModel):
     """Configuration for LLM provider."""
-    provider: Literal["openrouter", "openai", "custom"]
+    provider: Literal["openrouter", "openai", "custom", "ollama"]
     api_key: str
     model: str
     base_url: Optional[HttpUrl] = None
@@ -20,7 +20,7 @@ class LLMConfig(BaseModel):
 
     # Optional checker LLM for maker-checker pattern (false positive elimination)
     enable_checker: bool = Field(default=False)  # Enable second LLM validation
-    checker_provider: Optional[Literal["openrouter", "openai", "custom"]] = None
+    checker_provider: Optional[Literal["openrouter", "openai", "custom", "ollama"]] = None
     checker_api_key: Optional[str] = None
     checker_model: Optional[str] = None
     checker_base_url: Optional[HttpUrl] = None
@@ -64,7 +64,7 @@ class LLMConfig(BaseModel):
         if self.enable_checker:
             if not self.checker_provider:
                 raise ValueError("checker_provider is required when enable_checker is True")
-            if not self.checker_api_key:
+            if not self.checker_api_key and self.checker_provider != "ollama":
                 raise ValueError("checker_api_key is required when enable_checker is True")
             if not self.checker_model:
                 raise ValueError("checker_model is required when enable_checker is True")
@@ -90,10 +90,14 @@ class LLMConfig(BaseModel):
             if not custom_url:
                 raise ValueError("CUSTOM_PROVIDER_URL is required for custom provider")
             base_url = custom_url
+        elif provider == "ollama":
+            api_key = os.getenv("OLLAMA_API_KEY", "ollama")  # Dummy API key for ollama if needed
+            model = os.getenv("OLLAMA_MODEL", "llama3")
+            base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
         else:
             raise ValueError(f"Invalid provider: {provider}")
 
-        if not api_key:
+        if not api_key and provider != "ollama":
             raise ValueError(f"API key not found for provider: {provider}")
 
         # Get optional rate limit delay from environment
@@ -122,8 +126,12 @@ class LLMConfig(BaseModel):
                 if not checker_url:
                     raise ValueError("CHECKER_CUSTOM_PROVIDER_URL is required for custom checker provider")
                 checker_base_url = checker_url
+            elif checker_provider == "ollama":
+                checker_api_key = os.getenv("CHECKER_OLLAMA_API_KEY", "ollama")
+                checker_model = os.getenv("CHECKER_OLLAMA_MODEL", "llama3")
+                checker_base_url = os.getenv("CHECKER_OLLAMA_BASE_URL", "http://localhost:11434")
 
-            if not checker_api_key:
+            if not checker_api_key and checker_provider != "ollama":
                 raise ValueError(f"Checker API key not found for provider: {checker_provider}")
 
         return cls(

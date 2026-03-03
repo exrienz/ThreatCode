@@ -9,6 +9,7 @@ from src.scanner.file_collector import FileCollector
 from src.scanner.providers.base import BaseLLMProvider
 from src.scanner.providers.openrouter import OpenRouterProvider
 from src.scanner.providers.openai import OpenAIProvider
+from src.scanner.providers.ollama import OllamaProvider
 from src.utils.config import Finding, LLMConfig, ReportData, ScanConfig
 
 
@@ -60,6 +61,17 @@ class CodeAnalyzer:
             # Override base URL
             provider.BASE_URL = str(self.llm_config.base_url).rstrip('/')
             return provider
+        elif self.llm_config.provider == "ollama":
+            provider = OllamaProvider(
+                api_key=self.llm_config.api_key,
+                model=self.llm_config.model,
+                timeout=self.llm_config.timeout,
+                rate_limit_delay=self.llm_config.rate_limit_delay
+            )
+            # Override base URL
+            if self.llm_config.base_url:
+                provider.BASE_URL = str(self.llm_config.base_url).rstrip('/') + '/api'
+            return provider
         else:
             raise ValueError(f"Unknown provider: {self.llm_config.provider}")
 
@@ -96,6 +108,17 @@ class CodeAnalyzer:
             )
             # Override base URL
             provider.BASE_URL = str(self.llm_config.checker_base_url).rstrip('/')
+            return provider
+        elif self.llm_config.checker_provider == "ollama":
+            provider = OllamaProvider(
+                api_key=self.llm_config.checker_api_key,
+                model=self.llm_config.checker_model,
+                timeout=self.llm_config.timeout,
+                rate_limit_delay=self.llm_config.rate_limit_delay
+            )
+            # Override base URL
+            if self.llm_config.checker_base_url:
+                provider.BASE_URL = str(self.llm_config.checker_base_url).rstrip('/') + '/api'
             return provider
         else:
             raise ValueError(f"Unknown checker provider: {self.llm_config.checker_provider}")
