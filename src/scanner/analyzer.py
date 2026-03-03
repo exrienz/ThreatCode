@@ -200,40 +200,70 @@ class CodeAnalyzer:
         findings = []
 
         # Combine files in the batch
-        combined_code = []
-        file_paths = []
+        payloads = []
+        current_combined_code = []
+        current_file_paths = []
+        current_size = 0
+
+        try:
+            input_path = Path(self.scan_config.input_path).resolve()
+        except Exception:
+            input_path = Path(self.scan_config.input_path)
 
         for file_path in batch:
             chunks = self.file_collector.read_file_chunked(file_path)
             for chunk_content, start_line in chunks:
-                # Add file marker
-                relative_path = file_path.relative_to(Path(self.scan_config.input_path))
-                combined_code.append(f"\n# File: {relative_path} (starting at line {start_line})\n")
-                combined_code.append(chunk_content)
-                file_paths.append(str(relative_path))
+                try:
+                    relative_path = file_path.relative_to(input_path)
+                except ValueError:
+                    relative_path = file_path.relative_to(Path(self.scan_config.input_path))
 
-        if not combined_code:
-            return findings
+                chunk_header = f"\n# File: {relative_path} (starting at line {start_line})\n"
 
-        code_chunk = ''.join(combined_code)
-        context = {
-            'file_paths': list(set(file_paths)),
-            'batch_size': len(batch)
-        }
+                chunk_str = chunk_header + chunk_content
+                chunk_size = len(chunk_str.encode('utf-8'))
 
-        try:
-            batch_findings = await self.provider.analyze_code(code_chunk, context)
+                if current_size + chunk_size > self.scan_config.batch_size and current_combined_code:
+                    payloads.append({
+                        'code': ''.join(current_combined_code),
+                        'paths': list(set(current_file_paths)),
+                        'file_count': len(set(current_file_paths))
+                    })
+                    current_combined_code = []
+                    current_file_paths = []
+                    current_size = 0
 
-            # Store code chunk for validation (use finding title as key)
-            if self.llm_config.enable_checker:
-                for finding in batch_findings:
-                    # Store original code for this finding
-                    finding_key = f"{finding.title}_{len(self.batch_codes)}"
-                    self.batch_codes[finding_key] = code_chunk
+                current_combined_code.append(chunk_str)
+                current_file_paths.append(str(relative_path))
+                current_size += chunk_size
 
-            findings.extend(batch_findings)
-        except Exception as e:
-            print(f"Warning: Error analyzing batch: {e}")
+        if current_combined_code:
+            payloads.append({
+                'code': ''.join(current_combined_code),
+                'paths': list(set(current_file_paths)),
+                'file_count': len(set(current_file_paths))
+            })
+
+        for payload in payloads:
+            code_chunk = payload['code']
+            context = {
+                'file_paths': payload['paths'],
+                'batch_size': payload['file_count']
+            }
+
+            try:
+                batch_findings = await self.provider.analyze_code(code_chunk, context)
+
+                # Store code chunk for validation (use finding title as key)
+                if self.llm_config.enable_checker:
+                    for finding in batch_findings:
+                        # Store original code for this finding
+                        finding_key = f"{finding.title}_{len(self.batch_codes)}"
+                        self.batch_codes[finding_key] = code_chunk
+
+                findings.extend(batch_findings)
+            except Exception as e:
+                print(f"Warning: Error analyzing batch: {e}")
 
         return findings
 
