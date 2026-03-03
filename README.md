@@ -86,6 +86,23 @@ docker run --rm \
   --name "MyApp"
 ```
 
+### Using Local Ollama Model
+
+Ensure your local Ollama instance is running and accessible (you may need to configure network access when running via Docker):
+
+```bash
+docker run --rm \
+  --network host \
+  -v $(pwd):/scan \
+  -e LLM_PROVIDER=ollama \
+  -e OLLAMA_MODEL=llama3 \
+  -e OLLAMA_BASE_URL=http://localhost:11434 \
+  exrienz/threatcode:latest scan \
+  --input /scan \
+  --output /scan \
+  --name "MyApp"
+```
+
 ### Using a Custom LLM Provider
 
 ```bash
@@ -377,6 +394,8 @@ ThreatCode follows security best practices:
 | `OPENROUTER_MODEL` | OpenRouter model name | For OpenRouter | `anthropic/claude-3-haiku` |
 | `OPENAI_API_KEY` | OpenAI API key | For OpenAI | `sk-...` |
 | `OPENAI_MODEL` | OpenAI model name | For OpenAI | `gpt-4` |
+| `OLLAMA_MODEL` | Ollama model name | For Ollama | `llama3` |
+| `OLLAMA_BASE_URL` | Ollama base URL | No | `http://localhost:11434` (default) |
 | `CUSTOM_API_KEY` | Custom provider API key | For custom | Your API key |
 | `CUSTOM_MODEL` | Custom provider model | For custom | Model identifier |
 | `CUSTOM_PROVIDER_URL` | Custom provider base URL | For custom | `https://api.example.com/v1` |
@@ -393,6 +412,8 @@ ThreatCode follows security best practices:
 | `CHECKER_OPENROUTER_MODEL` | Checker OpenRouter model | For OpenRouter checker | `anthropic/claude-3-opus` |
 | `CHECKER_OPENAI_API_KEY` | Checker OpenAI API key | For OpenAI checker | `sk-...` |
 | `CHECKER_OPENAI_MODEL` | Checker OpenAI model | For OpenAI checker | `gpt-4` |
+| `CHECKER_OLLAMA_MODEL` | Checker Ollama model | For Ollama checker | `llama3` |
+| `CHECKER_OLLAMA_BASE_URL`| Checker Ollama base URL| No | `http://localhost:11434` (default) |
 | `CHECKER_CUSTOM_API_KEY` | Checker custom API key | For custom checker | Your API key |
 | `CHECKER_CUSTOM_MODEL` | Checker custom model | For custom checker | Model identifier |
 | `CHECKER_CUSTOM_PROVIDER_URL` | Checker custom base URL | For custom checker | `https://api.example.com/v1` |

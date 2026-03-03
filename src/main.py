@@ -72,6 +72,11 @@ def scan(input, output, name, max_file_size, max_workers, ci):
         export OPENAI_API_KEY=sk-...
         export OPENAI_MODEL=gpt-4
         python -m src.main scan -i /path/to/code -o ./reports
+
+        # Scan with local Ollama
+        export LLM_PROVIDER=ollama
+        export OLLAMA_MODEL=llama3
+        python -m src.main scan -i /path/to/code -o ./reports
     """
     click.echo("=" * 60)
     click.echo("ThreatCode Security Scanner")
@@ -143,7 +148,7 @@ def scan(input, output, name, max_file_size, max_workers, ci):
     except ValueError as e:
         click.echo(f"\nConfiguration Error: {e}", err=True)
         click.echo("\nPlease ensure the following environment variables are set:", err=True)
-        click.echo("  - LLM_PROVIDER (openrouter, openai, or custom)", err=True)
+        click.echo("  - LLM_PROVIDER (openrouter, openai, custom, or ollama)", err=True)
         click.echo("  - OPENROUTER_API_KEY (for OpenRouter)", err=True)
         click.echo("  - OPENROUTER_MODEL (for OpenRouter)", err=True)
         click.echo("  - OPENAI_API_KEY (for OpenAI)", err=True)
@@ -151,6 +156,8 @@ def scan(input, output, name, max_file_size, max_workers, ci):
         click.echo("  - CUSTOM_API_KEY (for custom provider)", err=True)
         click.echo("  - CUSTOM_MODEL (for custom provider)", err=True)
         click.echo("  - CUSTOM_PROVIDER_URL (for custom provider)", err=True)
+        click.echo("  - OLLAMA_MODEL (for Ollama)", err=True)
+        click.echo("  - OLLAMA_BASE_URL (for Ollama, optional)", err=True)
         sys.exit(1)
 
     except Exception as e:
@@ -192,6 +199,13 @@ def providers():
     click.echo("     - CUSTOM_API_KEY=<your-key>")
     click.echo("     - CUSTOM_MODEL=<model-name>")
     click.echo("     - CUSTOM_PROVIDER_URL=<base-url>")
+
+    click.echo("\n4. Ollama (Local)")
+    click.echo("   Base URL: http://localhost:11434")
+    click.echo("   Environment variables:")
+    click.echo("     - LLM_PROVIDER=ollama")
+    click.echo("     - OLLAMA_MODEL=<model-name> (e.g. llama3)")
+    click.echo("     - OLLAMA_BASE_URL=<base-url> (optional)")
     click.echo()
 
 
