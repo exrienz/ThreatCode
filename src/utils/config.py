@@ -166,6 +166,7 @@ class Finding(BaseModel):
     validation_confidence: Optional[Literal["High", "Medium", "Low"]] = None  # Checker's confidence level
     validation_rationale: Optional[str] = None  # Checker's reasoning for the verdict
     validated_by_model: Optional[str] = None  # Model identifier used for validation
+    context_id: Optional[str] = None  # Reference to the original code context
 
 
 class ReportData(BaseModel):
@@ -253,9 +254,10 @@ class ScanConfig(BaseModel):
     input_path: str
     output_path: str
     application_name: str
-    max_file_size: int = Field(default=1048576, ge=1024)  # 1MB default
+    max_file_size: int = Field(default=5242880, ge=1024)  # 5MB default
     chunk_size: int = Field(default=51200, ge=1024)  # 50KB default
     batch_size: int = Field(default=102400, ge=1024)  # 100KB default
+    chunk_overlap: int = Field(default=2048, ge=0)  # 2KB default overlap
     max_workers: int = Field(default=10, ge=1, le=20)
     supported_extensions: List[str] = Field(
         default_factory=lambda: [
