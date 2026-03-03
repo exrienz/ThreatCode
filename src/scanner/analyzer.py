@@ -28,6 +28,8 @@ class CodeAnalyzer:
         self.checker_provider = self._create_checker_provider() if llm_config.enable_checker else None
         self.file_collector = FileCollector(scan_config)
         self.batch_codes = {}  # Store original code for validation
+        self._context_counter = 0
+        self._counter_lock = asyncio.Lock()
 
     def _create_provider(self) -> BaseLLMProvider:
         """Create appropriate LLM provider based on config.
@@ -197,45 +199,66 @@ class CodeAnalyzer:
         Returns:
             List of findings from the batch
         """
-        findings = []
+        all_findings = []
 
-        # Combine files in the batch
-        combined_code = []
-        file_paths = []
+        current_combined_code = []
+        current_file_paths = []
+        current_size = 0
+
+        async def send_current_sub_batch():
+            if not current_combined_code:
+                return []
+
+            code_chunk = ''.join(current_combined_code)
+            context = {
+                'file_paths': list(set(current_file_paths)),
+                'batch_size': len(current_file_paths)
+            }
+
+            try:
+                batch_findings = await self.provider.analyze_code(code_chunk, context)
+
+                # Store code chunk for validation using a unique context_id
+                if self.llm_config.enable_checker:
+                    async with self._counter_lock:
+                        self._context_counter += 1
+                        context_id = f"ctx_{self._context_counter}"
+
+                    self.batch_codes[context_id] = code_chunk
+                    for finding in batch_findings:
+                        finding.context_id = context_id
+
+                return batch_findings
+            except Exception as e:
+                print(f"Warning: Error analyzing sub-batch: {e}")
+                return []
 
         for file_path in batch:
+            relative_path = file_path.relative_to(Path(self.scan_config.input_path))
             chunks = self.file_collector.read_file_chunked(file_path)
+
             for chunk_content, start_line in chunks:
-                # Add file marker
-                relative_path = file_path.relative_to(Path(self.scan_config.input_path))
-                combined_code.append(f"\n# File: {relative_path} (starting at line {start_line})\n")
-                combined_code.append(chunk_content)
-                file_paths.append(str(relative_path))
+                marker = f"\n# File: {relative_path} (starting at line {start_line})\n"
+                marker_size = len(marker.encode('utf-8'))
+                chunk_size = len(chunk_content.encode('utf-8'))
 
-        if not combined_code:
-            return findings
+                # If adding this chunk exceeds batch size, send current sub-batch first
+                if current_size + marker_size + chunk_size > self.scan_config.batch_size and current_combined_code:
+                    all_findings.extend(await send_current_sub_batch())
+                    current_combined_code = []
+                    current_file_paths = []
+                    current_size = 0
 
-        code_chunk = ''.join(combined_code)
-        context = {
-            'file_paths': list(set(file_paths)),
-            'batch_size': len(batch)
-        }
+                current_combined_code.append(marker)
+                current_combined_code.append(chunk_content)
+                current_file_paths.append(str(relative_path))
+                current_size += marker_size + chunk_size
 
-        try:
-            batch_findings = await self.provider.analyze_code(code_chunk, context)
+        # Send remaining chunks
+        if current_combined_code:
+            all_findings.extend(await send_current_sub_batch())
 
-            # Store code chunk for validation (use finding title as key)
-            if self.llm_config.enable_checker:
-                for finding in batch_findings:
-                    # Store original code for this finding
-                    finding_key = f"{finding.title}_{len(self.batch_codes)}"
-                    self.batch_codes[finding_key] = code_chunk
-
-            findings.extend(batch_findings)
-        except Exception as e:
-            print(f"Warning: Error analyzing batch: {e}")
-
-        return findings
+        return all_findings
 
     async def _validate_findings(self, findings: List[Finding]) -> List[Finding]:
         """Validate findings using checker LLM.
@@ -252,12 +275,11 @@ class CodeAnalyzer:
         validated_findings = []
 
         with tqdm(total=len(findings), desc="Validating findings") as pbar:
-            for idx, finding in enumerate(findings):
-                # Get the stored code for this finding
-                finding_key = f"{finding.title}_{idx}" if f"{finding.title}_{idx}" in self.batch_codes else None
+            for finding in findings:
+                # Use context_id if available
+                original_code = self.batch_codes.get(finding.context_id, "")
 
-                # If we don't have stored code, use the evidence code
-                original_code = self.batch_codes.get(finding_key, "")
+                # If we don't have stored code, use the evidence code as fallback
                 if not original_code and finding.evidence:
                     # Fallback: combine evidence code snippets
                     original_code = "\n\n".join([

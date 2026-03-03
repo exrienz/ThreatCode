@@ -100,7 +100,7 @@ class FileCollector:
         return False
 
     def read_file_chunked(self, file_path: Path) -> List[Tuple[str, int]]:
-        """Read a file in chunks with line tracking.
+        """Read a file in chunks with line tracking and overlap.
 
         Args:
             file_path: Path to the file
@@ -113,6 +113,7 @@ class FileCollector:
         current_size = 0
         line_number = 1
         chunk_start_line = 1
+        overlap_buffer = []
 
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -122,17 +123,32 @@ class FileCollector:
                     # Start new chunk if size limit reached
                     if current_size + line_size > self.config.chunk_size and current_chunk:
                         chunks.append((''.join(current_chunk), chunk_start_line))
-                        current_chunk = []
-                        current_size = 0
-                        chunk_start_line = line_number
+
+                        # Prepare overlap for next chunk
+                        overlap_buffer = []
+                        overlap_size = 0
+                        # Work backwards to fill overlap buffer up to config.chunk_overlap
+                        for i in range(len(current_chunk) - 1, -1, -1):
+                            l = current_chunk[i]
+                            l_size = len(l.encode('utf-8'))
+                            if overlap_size + l_size > self.config.chunk_overlap:
+                                if overlap_buffer or self.config.chunk_overlap == 0:
+                                    break
+                            overlap_buffer.insert(0, l)
+                            overlap_size += l_size
+
+                        current_chunk = list(overlap_buffer)
+                        current_size = overlap_size
+                        chunk_start_line = line_number - len(overlap_buffer)
 
                     current_chunk.append(line)
                     current_size += line_size
                     line_number += 1
 
-                # Add remaining content
+                # Add remaining content if it contains more than just the overlap
                 if current_chunk:
-                    chunks.append((''.join(current_chunk), chunk_start_line))
+                    if not chunks or len(current_chunk) > len(overlap_buffer):
+                        chunks.append((''.join(current_chunk), chunk_start_line))
 
         except Exception as e:
             print(f"Warning: Error reading {file_path}: {e}")
